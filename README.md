@@ -58,7 +58,7 @@ bash <(curl -L https://raw.githubusercontent.com/iKeilo/FLVXR2/main/panel_instal
 
 ## Original Project
 - **Name**: FLVX转发面板
-- **Source**: https://github.com/Sagit-chu/flvx
+- **Source**: https://github.com/iKeilo/FLVXR2
 - **License**: Apache License 2.0
 
 ## Modifications
