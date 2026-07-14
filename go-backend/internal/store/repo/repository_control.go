@@ -412,12 +412,26 @@ func (r *Repository) ListActiveNftablesForwards() ([]model.ForwardRecord, error)
 	if r == nil || r.db == nil {
 		return nil, errors.New("repository not initialized")
 	}
-	var forwards []model.ForwardRecord
+	var forwards []model.Forward
 	err := r.db.
 		Where("status = 1 AND mode = 'nftables'").
 		Find(&forwards).Error
 	if err != nil {
 		return nil, err
 	}
-	return forwards, nil
+	rows := make([]model.ForwardRecord, 0, len(forwards))
+	for _, forward := range forwards {
+		rows = append(rows, model.ForwardRecord{
+			ID:         forward.ID,
+			UserID:     forward.UserID,
+			UserName:   forward.UserName,
+			Name:       forward.Name,
+			TunnelID:   forward.TunnelID,
+			RemoteAddr: forward.RemoteAddr,
+			Strategy:   forward.Strategy,
+			Status:     forward.Status,
+			Mode:       forward.Mode,
+		})
+	}
+	return rows, nil
 }

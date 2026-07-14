@@ -218,6 +218,10 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.NodeRuntimeResource{},
 		&model.PathRuntimeVersion{},
 		&model.SpeedLimit{},
+		&model.PolicyProvider{},
+		&model.PolicyRule{},
+		&model.PolicyBinding{},
+		&model.PolicyDeploymentLog{},
 		&model.StatisticsFlow{},
 		&model.Tunnel{},
 		&model.ChainTunnel{},
@@ -596,13 +600,23 @@ func (r *Repository) UsernameExistsExceptID(username string, exceptID int64) (bo
 	return count > 0, nil
 }
 
-func (r *Repository) UpdateUserNameAndPassword(userID int64, username, passwordMD5 string, now int64) error {
+func (r *Repository) UpdateUserNameAndPassword(userID int64, username, passwordHash string, now int64) error {
 	if r == nil || r.db == nil {
 		return errors.New("repository not initialized")
 	}
 	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"user":         username,
-		"pwd":          passwordMD5,
+		"pwd":          passwordHash,
+		"updated_time": now,
+	}).Error
+}
+
+func (r *Repository) UpdateUserPasswordHash(userID int64, passwordHash string, now int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"pwd":          passwordHash,
 		"updated_time": now,
 	}).Error
 }

@@ -110,6 +110,26 @@ const (
 	configKeyGlobalAppBackground = "global_app_bg_image"
 )
 
+var publicConfigKeys = map[string]struct{}{
+	"app_name":                 {},
+	"app_logo":                 {},
+	"app_favicon":              {},
+	configKeyAppBackground:     {},
+	"registration_enabled":     {},
+	"register_captcha_enabled": {},
+	"captcha_enabled":          {},
+	"cloudflare_site_key":      {},
+	"store_enabled":            {},
+	"payment_enabled":          {},
+	"login_monitor_link":       {},
+}
+
+var sensitiveConfigKeys = map[string]struct{}{
+	"license_key":           {},
+	"hmac_key":              {},
+	"cloudflare_secret_key": {},
+}
+
 func New(repo *repo.Repository, jwtSecret string, fluxVersion string) *Handler {
 	h := &Handler{
 		repo:                repo,
@@ -289,6 +309,16 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/speed-limit/create", h.speedLimitCreate)
 	mux.HandleFunc("/api/v1/speed-limit/update", h.speedLimitUpdate)
 	mux.HandleFunc("/api/v1/speed-limit/delete", h.speedLimitDelete)
+	mux.HandleFunc("/api/v1/policy/bundle", h.policyBundle)
+	mux.HandleFunc("/api/v1/policy/provider/save", h.policyProviderSave)
+	mux.HandleFunc("/api/v1/policy/provider/delete", h.policyProviderDelete)
+	mux.HandleFunc("/api/v1/policy/rule/save", h.policyRuleSave)
+	mux.HandleFunc("/api/v1/policy/rule/delete", h.policyRuleDelete)
+	mux.HandleFunc("/api/v1/policy/binding/save", h.policyBindingSave)
+	mux.HandleFunc("/api/v1/policy/binding/delete", h.policyBindingDelete)
+	mux.HandleFunc("/api/v1/policy/apply", h.policyApply)
+	mux.HandleFunc("/api/v1/policy/remove", h.policyRemove)
+	mux.HandleFunc("/api/v1/policy/status", h.policyStatus)
 	mux.HandleFunc("/api/v1/tunnel/user/tunnel", h.userTunnelVisibleList)
 	mux.HandleFunc("/api/v1/tunnel/user/list", h.userTunnelList)
 	mux.HandleFunc("/api/v1/group/tunnel/list", h.tunnelGroupList)
@@ -487,7 +517,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("账号或密码错误"))
 		return
 	}
-	if user.Pwd != security.MD5(req.Password) {
+	if !h.verifyAndUpgradePassword(user.ID, user.Pwd, req.Password) {
 		response.WriteJSON(w, response.ErrDefault("账号或密码错误"))
 		return
 	}
@@ -575,6 +605,14 @@ func (h *Handler) getConfigByName(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := strings.TrimSpace(req.Name)
+	if isSensitiveConfigKey(name) {
+		response.WriteJSON(w, response.ErrDefault("配置不存在"))
+		return
+	}
+	if !h.isAdminRequest(r) && !isPublicConfigKey(name) {
+		response.WriteJSON(w, response.Err(403, "权限不足，仅管理员可读取该配置"))
+		return
+	}
 	if name == configKeyAppBackground {
 		value := ""
 		if cfg, err := h.repo.GetConfigByName(configKeyGlobalAppBackground); err == nil && cfg != nil {
@@ -627,6 +665,18 @@ func (h *Handler) getConfigs(w http.ResponseWriter, r *http.Request) {
 		if _, hasLegacy := cfgMap[configKeyAppBackground]; !hasLegacy {
 			cfgMap[configKeyAppBackground] = globalValue
 		}
+	}
+	for key := range sensitiveConfigKeys {
+		delete(cfgMap, key)
+	}
+	if !h.isAdminRequest(r) {
+		publicConfigs := make(map[string]string, len(publicConfigKeys))
+		for key := range publicConfigKeys {
+			if value, ok := cfgMap[key]; ok {
+				publicConfigs[key] = value
+			}
+		}
+		cfgMap = publicConfigs
 	}
 	if userID, ok := h.optionalUserIDFromRequest(r); ok && userID > 0 {
 		setting, settingErr := h.repo.GetUserSetting(userID, configKeyAppBackground)
@@ -931,7 +981,7 @@ func (h *Handler) openAPISubStore(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
-	if user == nil || user.Pwd != security.MD5(password) {
+	if user == nil || !h.verifyAndUpgradePassword(user.ID, user.Pwd, password) {
 		response.WriteJSON(w, response.ErrDefault("鉴权失败"))
 		return
 	}
@@ -1555,7 +1605,7 @@ func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.Pwd != security.MD5(req.CurrentPassword) {
+	if !h.verifyAndUpgradePassword(user.ID, user.Pwd, req.CurrentPassword) {
 		response.WriteJSON(w, response.ErrDefault("当前密码错误"))
 		return
 	}
@@ -1570,7 +1620,12 @@ func (h *Handler) updatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.UpdateUserNameAndPassword(userID, req.NewUsername, security.MD5(req.NewPassword), time.Now().UnixMilli()); err != nil {
+	passwordHash, err := security.HashPassword(req.NewPassword)
+	if err != nil {
+		response.WriteJSON(w, response.ErrDefault("新密码长度无效"))
+		return
+	}
+	if err := h.repo.UpdateUserNameAndPassword(userID, req.NewUsername, passwordHash, time.Now().UnixMilli()); err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
@@ -1726,6 +1781,19 @@ func parseUserID(sub string) (int64, error) {
 	return id, nil
 }
 
+func (h *Handler) verifyAndUpgradePassword(userID int64, storedHash, password string) bool {
+	valid, needsUpgrade := security.VerifyPassword(storedHash, password)
+	if !valid {
+		return false
+	}
+	if needsUpgrade {
+		if passwordHash, err := security.HashPassword(password); err == nil {
+			_ = h.repo.UpdateUserPasswordHash(userID, passwordHash, time.Now().UnixMilli())
+		}
+	}
+	return true
+}
+
 func userIDFromRequest(r *http.Request) (int64, error) {
 	claims, ok := r.Context().Value(middleware.ClaimsContextKey).(auth.Claims)
 	if !ok {
@@ -1735,11 +1803,23 @@ func userIDFromRequest(r *http.Request) (int64, error) {
 }
 
 func (h *Handler) optionalUserIDFromRequest(r *http.Request) (int64, bool) {
-	if r == nil {
+	claims, ok := h.optionalClaimsFromRequest(r)
+	if !ok {
 		return 0, false
 	}
-	if userID, err := userIDFromRequest(r); err == nil && userID > 0 {
-		return userID, true
+	userID, err := parseUserID(claims.Sub)
+	if err != nil || userID <= 0 {
+		return 0, false
+	}
+	return userID, true
+}
+
+func (h *Handler) optionalClaimsFromRequest(r *http.Request) (auth.Claims, bool) {
+	if r == nil {
+		return auth.Claims{}, false
+	}
+	if claims, ok := r.Context().Value(middleware.ClaimsContextKey).(auth.Claims); ok {
+		return claims, true
 	}
 
 	token := handlerBearerToken(strings.TrimSpace(r.Header.Get("Authorization")))
@@ -1749,18 +1829,25 @@ func (h *Handler) optionalUserIDFromRequest(r *http.Request) (int64, bool) {
 		}
 	}
 	if token == "" || strings.TrimSpace(h.jwtSecret) == "" {
-		return 0, false
+		return auth.Claims{}, false
 	}
 
-	claims, ok := auth.ValidateToken(token, h.jwtSecret)
-	if !ok {
-		return 0, false
-	}
-	userID, err := parseUserID(claims.Sub)
-	if err != nil || userID <= 0 {
-		return 0, false
-	}
-	return userID, true
+	return auth.ValidateToken(token, h.jwtSecret)
+}
+
+func (h *Handler) isAdminRequest(r *http.Request) bool {
+	claims, ok := h.optionalClaimsFromRequest(r)
+	return ok && claims.RoleID == 0
+}
+
+func isPublicConfigKey(name string) bool {
+	_, ok := publicConfigKeys[name]
+	return ok
+}
+
+func isSensitiveConfigKey(name string) bool {
+	_, ok := sensitiveConfigKeys[name]
+	return ok
 }
 
 func handlerBearerToken(value string) string {
@@ -1780,6 +1867,19 @@ func userRoleFromRequest(r *http.Request) (int64, int, error) {
 		return 0, 0, err
 	}
 	return userID, claims.RoleID, nil
+}
+
+func (h *Handler) ensureSelfOrAdmin(w http.ResponseWriter, r *http.Request, targetUserID int64) bool {
+	userID, roleID, err := userRoleFromRequest(r)
+	if err != nil {
+		response.WriteJSON(w, response.Err(401, "用户信息错误"))
+		return false
+	}
+	if roleID == 0 || userID == targetUserID {
+		return true
+	}
+	response.WriteJSON(w, response.Err(403, "权限不足，不能修改其他用户"))
+	return false
 }
 
 func nullableNullInt64(v sql.NullInt64) interface{} {

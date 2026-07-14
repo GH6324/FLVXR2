@@ -350,9 +350,9 @@ export default function ConfigPage() {
       if (res.code === 0 && res.data) {
         setLicenseStatus(res.data);
         if (res.data.has_license_key) {
-          setLicenseKey(res.data.license_key || "");
+          setLicenseKey("");
           setLicenseDomain(res.data.domain || "");
-          setHmacKey(res.data.hmac_key || "");
+          setHmacKey("");
         }
       } else {
         setLicenseKey("");
@@ -379,17 +379,8 @@ export default function ConfigPage() {
       if (res.code === 0) {
         toast.success("授权配置已提交，正在后台验证...");
 
-        // 关键修复：保存成功后，延迟重新加载授权信息，获取最新的 license_key
         setTimeout(async () => {
           await loadLicenseInfo();
-          // 如果后端更新了授权码，同步更新输入框显示
-          if (
-            licenseStatus?.license_key &&
-            licenseStatus.license_key !== licenseKey.trim()
-          ) {
-            setLicenseKey(licenseStatus.license_key);
-          }
-          // 最后刷新页面
           setTimeout(() => window.location.reload(), 800);
         }, 1000);
 
@@ -431,17 +422,8 @@ export default function ConfigPage() {
       if (res.code === 0) {
         toast.success("授权配置已提交，正在后台验证...");
 
-        // 关键修复：保存成功后，延迟重新加载授权信息，获取最新的 license_key
         setTimeout(async () => {
           await loadLicenseInfo();
-          // 如果后端更新了授权码，同步更新输入框显示
-          if (
-            licenseStatus?.license_key &&
-            licenseStatus.license_key !== licenseKey.trim()
-          ) {
-            setLicenseKey(licenseStatus.license_key);
-          }
-          // 最后刷新页面
           setTimeout(() => window.location.reload(), 800);
         }, 1000);
 
@@ -1539,8 +1521,13 @@ export default function ConfigPage() {
                 </label>
                 <Input
                   classNames={{ input: "text-sm" }}
-                  placeholder="留空自动生成 7 天评估授权"
+                  placeholder={
+                    licenseStatus?.has_license_key
+                      ? "已配置，留空保持当前授权"
+                      : "留空自动生成 7 天评估授权"
+                  }
                   size="md"
+                  type="password"
                   value={licenseKey}
                   variant="bordered"
                   onChange={(e) => setLicenseKey(e.target.value)}
@@ -1552,14 +1539,19 @@ export default function ConfigPage() {
                 </label>
                 <Input
                   classNames={{ input: "text-sm" }}
-                  placeholder="联系管理员获取（flvx_ 开头）"
+                  placeholder={
+                    licenseStatus?.has_hmac_key
+                      ? "已配置，留空保持当前密钥"
+                      : "联系管理员获取（flvx_ 开头）"
+                  }
                   size="md"
+                  type="password"
                   value={hmacKey}
                   variant="bordered"
                   onChange={(e) => setHmacKey(e.target.value)}
                 />
                 <p className="text-xs text-gray-400">
-                  管理员没主动要求就不用填，保存自动返回默认值
+                  已保存的密钥不会返回到浏览器；仅在需要替换时重新输入
                 </p>
               </div>
             </div>

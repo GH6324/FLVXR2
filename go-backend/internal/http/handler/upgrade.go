@@ -35,6 +35,7 @@ var (
 type githubRelease struct {
 	TagName     string `json:"tag_name"`
 	Name        string `json:"name"`
+	Body        string `json:"body"`
 	PublishedAt string `json:"published_at"`
 	Prerelease  bool   `json:"prerelease"`
 	Draft       bool   `json:"draft"`
@@ -305,6 +306,7 @@ func (h *Handler) listReleases(w http.ResponseWriter, r *http.Request) {
 	type releaseItem struct {
 		Version     string `json:"version"`
 		Name        string `json:"name"`
+		Body        string `json:"body"`
 		PublishedAt string `json:"publishedAt"`
 		Prerelease  bool   `json:"prerelease"`
 		Channel     string `json:"channel"`
@@ -326,6 +328,7 @@ func (h *Handler) listReleases(w http.ResponseWriter, r *http.Request) {
 		items = append(items, releaseItem{
 			Version:     tag,
 			Name:        r.Name,
+			Body:        r.Body,
 			PublishedAt: r.PublishedAt,
 			Prerelease:  itemChannel == releaseChannelDev,
 			Channel:     itemChannel,
@@ -441,6 +444,7 @@ func (h *Handler) panelReleases(w http.ResponseWriter, r *http.Request) {
 	type releaseItem struct {
 		Version     string `json:"version"`
 		Name        string `json:"name"`
+		Body        string `json:"body"`
 		PublishedAt string `json:"publishedAt"`
 		Prerelease  bool   `json:"prerelease"`
 		Channel     string `json:"channel"`
@@ -462,6 +466,7 @@ func (h *Handler) panelReleases(w http.ResponseWriter, r *http.Request) {
 		items = append(items, releaseItem{
 			Version:     tag,
 			Name:        r.Name,
+			Body:        r.Body,
 			PublishedAt: r.PublishedAt,
 			Prerelease:  itemChannel == releaseChannelDev,
 			Channel:     itemChannel,

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"go-backend/internal/http/response"
 	"go-backend/internal/payment"
@@ -164,13 +165,31 @@ func (h *Handler) getPaymentConfigs(w http.ResponseWriter, r *http.Request) {
 	result := make([]map[string]interface{}, 0, len(list))
 	for _, cfg := range list {
 		result = append(result, map[string]interface{}{
+			"id":      cfg.ID,
 			"channel": cfg.Channel,
-			"config":  cfg.Config,
+			"config":  publicPaymentConfig(cfg.Channel, cfg.Config),
 			"enabled": cfg.Enabled,
 		})
 	}
 
 	response.WriteJSON(w, response.OK(result))
+}
+
+func publicPaymentConfig(channel, raw string) string {
+	public := map[string]interface{}{}
+	if strings.EqualFold(strings.TrimSpace(channel), "USDT") {
+		var config map[string]interface{}
+		if json.Unmarshal([]byte(raw), &config) == nil {
+			if network, ok := config["network"].(string); ok && strings.TrimSpace(network) != "" {
+				public["network"] = network
+			}
+		}
+	}
+	b, err := json.Marshal(public)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }
 
 func (h *Handler) savePaymentConfig(w http.ResponseWriter, r *http.Request) {

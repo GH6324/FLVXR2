@@ -14,6 +14,7 @@ import UserPage from "@/pages/user";
 import GroupPage from "@/pages/group";
 import ProfilePage from "@/pages/profile";
 import LimitPage from "@/pages/limit";
+import PolicyPage from "@/pages/policy";
 import ConfigPage from "@/pages/config";
 import PanelSharingPage from "@/pages/panel-sharing";
 import ShopPage from "@/pages/shop";
@@ -210,6 +211,14 @@ function App() {
           </ProtectedRoute>
         }
         path="/limit"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <PolicyPage />
+          </ProtectedRoute>
+        }
+        path="/policy"
       />
       <Route
         element={

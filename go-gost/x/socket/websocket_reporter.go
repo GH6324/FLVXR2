@@ -235,6 +235,7 @@ func NewWebSocketReporter(serverURL string, secret string) *WebSocketReporter {
 
 // Start 启动WebSocket报告器
 func (w *WebSocketReporter) Start() {
+	go w.restorePersistedPolicyPlans()
 	go w.run()
 }
 
@@ -1432,6 +1433,21 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 		result, err = w.handleGetWGForwardRuleStatus(cmd.Data)
 		response.Data = result
 		response.Type = "GetWGForwardRuleStatusResponse"
+	case "ApplyPolicyPlan":
+		var result map[string]interface{}
+		result, err = w.handleApplyPolicyPlan(cmd.Data)
+		response.Data = result
+		response.Type = "ApplyPolicyPlanResponse"
+	case "RemovePolicyPlan":
+		var result map[string]interface{}
+		result, err = w.handleRemovePolicyPlan(cmd.Data)
+		response.Data = result
+		response.Type = "RemovePolicyPlanResponse"
+	case "GetPolicyStatus":
+		var result map[string]interface{}
+		result, err = w.handleGetPolicyStatus(cmd.Data)
+		response.Data = result
+		response.Type = "GetPolicyStatusResponse"
 
 	default:
 		err = fmt.Errorf("未知命令类型: %s", cmd.Type)

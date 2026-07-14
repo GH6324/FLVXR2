@@ -127,8 +127,13 @@ func (h *Handler) userCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	roleID := 1
 	now := time.Now().UnixMilli()
+	passwordHash, err := security.HashPassword(pwd)
+	if err != nil {
+		response.WriteJSON(w, response.ErrDefault("密码长度无效"))
+		return
+	}
 
-	userID, err := h.repo.CreateUser(username, security.MD5(pwd), roleID, expTime, flow, flowResetTime, num, maxConnections, status, now, renewalAmount, balance, int64(autoRenew), nullableInt(speedLimitID))
+	userID, err := h.repo.CreateUser(username, passwordHash, roleID, expTime, flow, flowResetTime, num, maxConnections, status, now, renewalAmount, balance, int64(autoRenew), nullableInt(speedLimitID))
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
@@ -265,7 +270,12 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 在参数里增加了 name
-		if err := h.repo.UpdateUserWithPassword(id, username, security.MD5(pwd), name, flow, num, maxConnections, expTime, flowResetTime, status, now, renewalAmount, balance, int64(autoRenew), nullableInt(speedLimitID)); err != nil {
+		passwordHash, err := security.HashPassword(pwd)
+		if err != nil {
+			response.WriteJSON(w, response.ErrDefault("密码长度无效"))
+			return
+		}
+		if err := h.repo.UpdateUserWithPassword(id, username, passwordHash, name, flow, num, maxConnections, expTime, flowResetTime, status, now, renewalAmount, balance, int64(autoRenew), nullableInt(speedLimitID)); err != nil {
 			response.WriteJSON(w, response.Err(-2, err.Error()))
 			return
 		}
@@ -354,6 +364,9 @@ func (h *Handler) userToggleAutoRenew(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("用户ID不能为空"))
 		return
 	}
+	if !h.ensureSelfOrAdmin(w, r, id) {
+		return
+	}
 	autoRenew := asInt(req["autoRenew"], 0)
 	if autoRenew != 0 && autoRenew != 1 {
 		response.WriteJSON(w, response.ErrDefault("自动续费参数错误"))
@@ -386,6 +399,9 @@ func (h *Handler) userToggleAutoBuyTraffic(w http.ResponseWriter, r *http.Reques
 	id := asInt64(req["id"], 0)
 	if id <= 0 {
 		response.WriteJSON(w, response.ErrDefault("用户ID不能为空"))
+		return
+	}
+	if !h.ensureSelfOrAdmin(w, r, id) {
 		return
 	}
 	autoBuyTraffic := asInt(req["autoBuyTraffic"], 0)
@@ -6439,7 +6455,12 @@ func (h *Handler) userRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UnixMilli()
 	expTime := time.Now().Add(72 * time.Hour).UnixMilli()
-	userID, err := h.repo.CreateUser(req.User, security.MD5(req.Password), 1, expTime, 0, 1, 0, 0, 1, now, 0, 0, 0, nil)
+	passwordHash, err := security.HashPassword(req.Password)
+	if err != nil {
+		response.WriteJSON(w, response.ErrDefault("密码长度无效"))
+		return
+	}
+	userID, err := h.repo.CreateUser(req.User, passwordHash, 1, expTime, 0, 1, 0, 0, 1, now, 0, 0, 0, nil)
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return

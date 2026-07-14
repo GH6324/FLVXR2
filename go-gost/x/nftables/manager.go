@@ -1,4 +1,4 @@
-﻿//go:build linux
+//go:build linux
 
 package nftables
 
@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	TableName      = "flvx"
-	TableFamily    = nftables.TableFamilyINet
+	TableName        = "flvx"
+	TableFamily      = nftables.TableFamilyINet
 	PreroutingChain  = "prerouting"
 	PostroutingChain = "postrouting"
 )
@@ -68,10 +68,41 @@ func NewManager() (*Manager, error) {
 	// 清理内核中残留的旧 DNAT 规则，防止 agent 重启后重复添加
 	// 面板会通过 WebSocket 重新同步所有活跃规则
 	if err := m.clearStaleRules(); err != nil {
-		fmt.Printf("⚠️ clear stale rules failed: %v\n", err)
+		if !isRecoverableOwnedTableDecodeError(err) {
+			fmt.Printf("⚠️ clear stale rules failed: %v\n", err)
+		} else {
+			fmt.Printf("⚠️ legacy FLVX nftables rules are unreadable; recreating owned table: %v\n", err)
+			if resetErr := m.resetOwnedTable(); resetErr != nil {
+				return nil, fmt.Errorf("recover legacy nftables table: %w", resetErr)
+			}
+		}
 	}
 	enableIPForwarding()
 	return m, nil
+}
+
+func isRecoverableOwnedTableDecodeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "invalid limit unit value") ||
+		strings.Contains(message, "invalid limit type")
+}
+
+func (m *Manager) resetOwnedTable() error {
+	if m.table != nil {
+		m.conn.DelTable(m.table)
+		if err := m.conn.Flush(); err != nil {
+			return fmt.Errorf("delete unreadable table: %w", err)
+		}
+	}
+	m.table = nil
+	m.rules = make(map[string]*RuleState)
+	if err := m.initTable(); err != nil {
+		return fmt.Errorf("recreate table: %w", err)
+	}
+	return nil
 }
 
 func enableIPForwarding() {
@@ -173,8 +204,8 @@ func (m *Manager) AddRule(forwardID, nodeID, userID, userTunnelID int64, protoco
 
 	// Get prerouting chain
 	preroutingChain := &nftables.Chain{
-		Name:   PreroutingChain,
-		Table:  m.table,
+		Name:  PreroutingChain,
+		Table: m.table,
 	}
 
 	// Build match expressions: match protocol and ingress port
@@ -214,10 +245,7 @@ func (m *Manager) AddRule(forwardID, nodeID, userID, userTunnelID int64, protoco
 
 	// Speed limit
 	if speedLimit > 0 {
-		ruleExprs = append(ruleExprs, &expr.Limit{
-			Type: expr.LimitTypePkts,
-			Rate: uint64(speedLimit),
-		})
+		ruleExprs = append(ruleExprs, newSpeedLimitExpression(speedLimit))
 	}
 
 	// Counter
@@ -284,6 +312,14 @@ func (m *Manager) AddRule(forwardID, nodeID, userID, userTunnelID int64, protoco
 		CounterName:  counterName,
 	}
 	return nil
+}
+
+func newSpeedLimitExpression(speedLimitMbps int) *expr.Limit {
+	return &expr.Limit{
+		Type: expr.LimitTypePktBytes,
+		Rate: uint64(speedLimitMbps) * 1_000_000 / 8,
+		Unit: expr.LimitTimeSecond,
+	}
 }
 
 func (m *Manager) UpdateRule(forwardID int64, protocol string, port int, target string, speedLimit int) error {

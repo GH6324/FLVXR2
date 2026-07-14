@@ -190,6 +190,20 @@ export default function H5Layout({ children }: { children: React.ReactNode }) {
       ),
     },
     {
+      path: "/policy",
+      label: "策略",
+      adminOnly: true,
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            clipRule="evenodd"
+            d="M10 1.5l6 2.25v4.6c0 3.98-2.38 7.58-6 9.15-3.62-1.57-6-5.17-6-9.15v-4.6L10 1.5zm2.7 6.2a1 1 0 00-1.4-1.4L9 8.59 8.2 7.8a1 1 0 10-1.4 1.4l1.5 1.5a1 1 0 001.4 0l3-3z"
+            fillRule="evenodd"
+          />
+        </svg>
+      ),
+    },
+    {
       path: "/user",
       label: "用户",
       adminOnly: true,

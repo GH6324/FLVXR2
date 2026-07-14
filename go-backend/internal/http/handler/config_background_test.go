@@ -90,6 +90,103 @@ func TestConfigBackgroundReadFallsBackToGlobalForGuest(t *testing.T) {
 	}
 }
 
+func TestPublicConfigEndpointsFilterInternalAndSensitiveValues(t *testing.T) {
+	r, err := repo.Open(filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatalf("open repo: %v", err)
+	}
+	defer r.Close()
+
+	const secret = "test-jwt-secret"
+	h := New(r, secret, "3.0.27")
+	now := time.Now().UnixMilli()
+	for key, value := range map[string]string{
+		"app_name":                "FLVXR2",
+		"registration_enabled":    "false",
+		"forward_group_order_map": `{"1":2}`,
+		"license_key":             "license-secret",
+		"hmac_key":                "hmac-secret",
+		"cloudflare_secret_key":   "captcha-secret",
+	} {
+		if err := r.UpsertConfig(key, value, now); err != nil {
+			t.Fatalf("upsert %s: %v", key, err)
+		}
+	}
+
+	guestReq := httptest.NewRequest(http.MethodPost, "/api/v1/config/list", nil)
+	guestRes := httptest.NewRecorder()
+	h.getConfigs(guestRes, guestReq)
+	guestPayload := decodeConfigBackgroundResponse(t, guestRes)
+	guestConfigs := guestPayload.Data.(map[string]interface{})
+	if guestConfigs["app_name"] != "FLVXR2" {
+		t.Fatalf("expected public app_name, got %#v", guestConfigs["app_name"])
+	}
+	for _, key := range []string{"forward_group_order_map", "license_key", "hmac_key", "cloudflare_secret_key"} {
+		if _, ok := guestConfigs[key]; ok {
+			t.Fatalf("guest config response exposed %s", key)
+		}
+	}
+
+	adminToken, err := auth.GenerateToken(1, "admin", 0, secret)
+	if err != nil {
+		t.Fatalf("generate admin token: %v", err)
+	}
+	adminReq := httptest.NewRequest(http.MethodPost, "/api/v1/config/list", nil)
+	adminReq.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: adminToken})
+	adminRes := httptest.NewRecorder()
+	h.getConfigs(adminRes, adminReq)
+	adminPayload := decodeConfigBackgroundResponse(t, adminRes)
+	adminConfigs := adminPayload.Data.(map[string]interface{})
+	if _, ok := adminConfigs["forward_group_order_map"]; !ok {
+		t.Fatal("admin response must retain non-sensitive internal config")
+	}
+	for _, key := range []string{"license_key", "hmac_key", "cloudflare_secret_key"} {
+		if _, ok := adminConfigs[key]; ok {
+			t.Fatalf("admin config list exposed write-only secret %s", key)
+		}
+	}
+}
+
+func TestConfigGetRejectsInternalKeysForNonAdmin(t *testing.T) {
+	r, err := repo.Open(filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatalf("open repo: %v", err)
+	}
+	defer r.Close()
+
+	const secret = "test-jwt-secret"
+	h := New(r, secret, "3.0.27")
+	if err := r.UpsertConfig("forward_group_order_map", `{"1":2}`, time.Now().UnixMilli()); err != nil {
+		t.Fatalf("upsert internal config: %v", err)
+	}
+
+	userToken, err := auth.GenerateToken(2, "user", 1, secret)
+	if err != nil {
+		t.Fatalf("generate user token: %v", err)
+	}
+	userReq := httptest.NewRequest(http.MethodPost, "/api/v1/config/get", bytes.NewBufferString(`{"name":"forward_group_order_map"}`))
+	userReq.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: userToken})
+	userRes := httptest.NewRecorder()
+	h.getConfigByName(userRes, userReq)
+	var userPayload response.R
+	if err := json.Unmarshal(userRes.Body.Bytes(), &userPayload); err != nil {
+		t.Fatalf("decode user response: %v", err)
+	}
+	if userPayload.Code != 403 {
+		t.Fatalf("expected code 403, got %d", userPayload.Code)
+	}
+
+	adminToken, err := auth.GenerateToken(1, "admin", 0, secret)
+	if err != nil {
+		t.Fatalf("generate admin token: %v", err)
+	}
+	adminReq := httptest.NewRequest(http.MethodPost, "/api/v1/config/get", bytes.NewBufferString(`{"name":"forward_group_order_map"}`))
+	adminReq.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: adminToken})
+	adminRes := httptest.NewRecorder()
+	h.getConfigByName(adminRes, adminReq)
+	decodeConfigBackgroundResponse(t, adminRes)
+}
+
 func decodeConfigBackgroundResponse(t *testing.T, res *httptest.ResponseRecorder) response.R {
 	t.Helper()
 	if res.Code != http.StatusOK {

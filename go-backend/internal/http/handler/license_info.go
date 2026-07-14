@@ -52,7 +52,6 @@ func (h *Handler) licenseInfo(w http.ResponseWriter, r *http.Request) {
 	configured := licenseKey != ""
 
 	hasLicenseKey := licenseKey != ""
-	actualLicenseKey := licenseKey
 
 	tier, _ := middleware.GetLicenseTier()
 
@@ -82,10 +81,11 @@ func (h *Handler) licenseInfo(w http.ResponseWriter, r *http.Request) {
 		"reason":               reason,
 		"configured":           configured,
 		"has_license_key":      hasLicenseKey,
-		"license_key":          actualLicenseKey,
+		"license_key":          "",
 		"domain":               domain,
 		"tier":                 string(tier),
-		"hmac_key":             hmacKey,
+		"has_hmac_key":         hmacKey != "",
+		"hmac_key":             "",
 		"is_trial":             isTrial,
 		"trial_remaining_days": trialRemainingDays,
 		"commercial_profile":   commercialProfile,

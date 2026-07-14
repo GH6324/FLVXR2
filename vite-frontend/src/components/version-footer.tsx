@@ -11,6 +11,7 @@ import {
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Select, SelectItem } from "@/shadcn-bridge/heroui/select";
 import { Spinner } from "@/shadcn-bridge/heroui/spinner";
+import { ReleaseNotes } from "@/components/release-notes";
 import { PROJECT_REPOSITORY_URL } from "@/config/site";
 import {
   UPDATE_CHANNEL_CHANGED_EVENT,
@@ -213,6 +214,11 @@ export function VersionFooter({
     localStorage.setItem(UPGRADE_DISMISS_KEY, new Date().toISOString());
     setNotificationOpen(false);
   };
+
+  const selectedRelease =
+    releases.find((release) => release.version === selectedVersion) ||
+    releases[0] ||
+    null;
 
   return (
     <>
@@ -438,6 +444,7 @@ export function VersionFooter({
                         </SelectItem>
                       ))}
                     </Select>
+                    <ReleaseNotes body={selectedRelease?.body} />
                     <div className="flex items-center text-center gap-1.5 mb-2 text-default-000">
                       <span className="text-sm font-semibold">升级说明</span>
                     </div>

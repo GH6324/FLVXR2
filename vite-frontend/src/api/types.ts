@@ -167,6 +167,80 @@ export interface PathTunnelDetailApiItem {
   runtime?: PathRuntimeVersionApiItem | null;
 }
 
+export interface PolicyProviderApiItem {
+  id: number;
+  name: string;
+  providerType: string;
+  behavior: string;
+  url?: string;
+  path?: string;
+  intervalSec: number;
+  enabled: number;
+  rawYaml?: string;
+  checksum?: string;
+  ipRuleCount?: number;
+  domainRuleCount?: number;
+  unsupportedCount?: number;
+  lastStatus?: string;
+  lastError?: string;
+  lastRefreshTime?: number;
+  nextRefreshTime?: number;
+  createdTime?: number;
+  updatedTime?: number;
+}
+
+export interface PolicyRuleApiItem {
+  id: number;
+  name: string;
+  priority: number;
+  matchDirection: string;
+  matchSourceMode: string;
+  matchSourceValue?: string;
+  matchDestinationMode: string;
+  matchDestinationValue?: string;
+  providerId?: number;
+  action: string;
+  actionTarget?: string;
+  enabled: number;
+  createdTime?: number;
+  updatedTime?: number;
+}
+
+export interface PolicyBindingApiItem {
+  id: number;
+  policyId: number;
+  targetType: string;
+  targetId: number;
+  targetRole?: string;
+  nodeId: number;
+  interfaceName?: string;
+  listenPort?: number;
+  protocol?: string;
+  enabled: number;
+  createdTime?: number;
+  updatedTime?: number;
+}
+
+export interface PolicyDeploymentLogApiItem {
+  id: number;
+  bindingId: number;
+  policyId: number;
+  nodeId: number;
+  engine: string;
+  action: string;
+  status: string;
+  message?: string;
+  planJson?: string;
+  createdTime: number;
+}
+
+export interface PolicyBundleApiData {
+  providers: PolicyProviderApiItem[];
+  rules: PolicyRuleApiItem[];
+  bindings: PolicyBindingApiItem[];
+  logs: PolicyDeploymentLogApiItem[];
+}
+
 export interface UserApiItem {
   id: number;
   user: string;
@@ -859,6 +933,7 @@ export interface SystemUpgradeCapabilityApiData {
 export interface SystemUpgradeReleaseApiItem {
   version: string;
   name: string;
+  body: string;
   publishedAt: string;
   prerelease: boolean;
   channel: "stable" | "dev";

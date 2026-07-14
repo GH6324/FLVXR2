@@ -70,6 +70,10 @@ import type {
   DiscountCodeItem,
   BalanceLogItem,
   SubscriptionPackageApiItem,
+  PolicyBundleApiData,
+  PolicyProviderApiItem,
+  PolicyRuleApiItem,
+  PolicyBindingApiItem,
 } from "./types";
 
 import axios from "axios";
@@ -270,8 +274,13 @@ export const updatePathTunnel = (data: {
 export const applyPathTunnel = (id: number) =>
   Network.post("/path/apply", { id }, { timeout: NODE_DEPLOY_REQUEST_TIMEOUT });
 export const removePathTunnel = (id: number) =>
-  Network.post("/path/remove", { id }, { timeout: NODE_DEPLOY_REQUEST_TIMEOUT });
-export const deletePathTunnel = (id: number) => Network.post("/path/delete", { id });
+  Network.post(
+    "/path/remove",
+    { id },
+    { timeout: NODE_DEPLOY_REQUEST_TIMEOUT },
+  );
+export const deletePathTunnel = (id: number) =>
+  Network.post("/path/delete", { id });
 export const getPathTunnelStatus = (id: number) =>
   Network.post<Record<string, unknown>>("/path/status", { id });
 
@@ -415,6 +424,31 @@ export const updateSpeedLimit = (data: SpeedLimitMutationPayload) =>
   Network.post("/speed-limit/update", data);
 export const deleteSpeedLimit = (id: number) =>
   Network.post("/speed-limit/delete", { id });
+
+export const getPolicyBundle = () =>
+  Network.post<PolicyBundleApiData>("/policy/bundle", {});
+export const savePolicyProvider = (data: Partial<PolicyProviderApiItem>) =>
+  Network.post<PolicyProviderApiItem>("/policy/provider/save", data);
+export const deletePolicyProvider = (id: number) =>
+  Network.post("/policy/provider/delete", { id });
+export const savePolicyRule = (data: Partial<PolicyRuleApiItem>) =>
+  Network.post<PolicyRuleApiItem>("/policy/rule/save", data);
+export const deletePolicyRule = (id: number) =>
+  Network.post("/policy/rule/delete", { id });
+export const savePolicyBinding = (data: Partial<PolicyBindingApiItem>) =>
+  Network.post<PolicyBindingApiItem>("/policy/binding/save", data);
+export const deletePolicyBinding = (id: number) =>
+  Network.post("/policy/binding/delete", { id });
+export const applyPolicyBinding = (bindingId: number) =>
+  Network.post("/policy/apply", { bindingId }, { timeout: 2 * 60 * 1000 });
+export const removePolicyBinding = (bindingId: number) =>
+  Network.post("/policy/remove", { bindingId }, { timeout: 90 * 1000 });
+export const getPolicyBindingStatus = (bindingId: number) =>
+  Network.post<{
+    nodeResult?: {
+      data?: { status?: string; message?: string; nftApplied?: boolean };
+    };
+  }>("/policy/status", { bindingId }, { timeout: 90 * 1000 });
 
 // 修改密码接口
 export const updatePassword = (data: UpdatePasswordPayload) =>
@@ -764,10 +798,16 @@ export interface LicenseInfo {
   license_key: string;
   domain: string;
   tier?: "free" | "premium" | "blocked";
+  has_hmac_key?: boolean;
   hmac_key?: string;
   is_trial?: boolean;
   trial_remaining_days?: number;
-  commercial_profile?: "evaluation" | "personal" | "business" | "enterprise" | "channel";
+  commercial_profile?:
+    | "evaluation"
+    | "personal"
+    | "business"
+    | "enterprise"
+    | "channel";
   billing_allowed?: boolean;
   commercial_allowed?: boolean;
   multi_tenant_allowed?: boolean;
@@ -1026,6 +1066,7 @@ export interface PanelUpgradeCheckResponse {
 export interface PanelReleaseItem {
   version: string;
   name: string;
+  body: string;
   publishedAt: string;
   prerelease: boolean;
   channel: string;

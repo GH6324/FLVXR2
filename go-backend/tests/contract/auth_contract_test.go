@@ -65,6 +65,68 @@ func TestJWTMiddlewareContracts(t *testing.T) {
 		wrapped.ServeHTTP(res, req)
 		assertCodeMsg(t, res, 403, "权限不足，仅管理员可操作")
 	})
+
+	t.Run("non-admin blocked on every sensitive route family", func(t *testing.T) {
+		token, err := auth.GenerateToken(2, "normal_user", 1, secret)
+		if err != nil {
+			t.Fatalf("generate token: %v", err)
+		}
+		paths := []string{
+			"/api/v1/system/upgrade",
+			"/api/v1/panel/upgrade",
+			"/api/v1/license/config",
+			"/api/v1/license/transfer",
+			"/api/v1/node-group/create",
+			"/api/v1/node-tag/create",
+			"/api/v1/policy/bundle",
+			"/api/v1/payment/stats",
+			"/api/v1/payment/config/admin/list",
+			"/api/v1/billing/redeem/list",
+			"/api/v1/billing/balance-log/list",
+			"/api/v1/user/batch-delete",
+			"/api/v1/user/quota/reset",
+			"/api/v1/tunnel-group/create",
+		}
+		for _, path := range paths {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			req.Header.Set("Authorization", token)
+			res := httptest.NewRecorder()
+			wrapped.ServeHTTP(res, req)
+			assertCodeMsg(t, res, 403, "权限不足，仅管理员可操作")
+		}
+	})
+
+	t.Run("non-admin can reach authenticated self-service routes", func(t *testing.T) {
+		token, err := auth.GenerateToken(2, "normal_user", 1, secret)
+		if err != nil {
+			t.Fatalf("generate token: %v", err)
+		}
+		paths := []string{
+			"/api/v1/user/package",
+			"/api/v1/payment/config",
+			"/api/v1/billing/feature-status",
+			"/api/v1/tunnel/user/tunnel",
+		}
+		for _, path := range paths {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			req.Header.Set("Authorization", token)
+			res := httptest.NewRecorder()
+			wrapped.ServeHTTP(res, req)
+			assertCode(t, res, 0)
+		}
+	})
+
+	t.Run("signed payment callbacks bypass JWT", func(t *testing.T) {
+		for _, path := range []string{
+			"/api/v1/payment/callback/yipay",
+			"/api/v1/payment/callback/usdt",
+		} {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			res := httptest.NewRecorder()
+			wrapped.ServeHTTP(res, req)
+			assertCode(t, res, 0)
+		}
+	})
 }
 
 func assertCode(t *testing.T, rec *httptest.ResponseRecorder, expected int) {

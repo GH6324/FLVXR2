@@ -20,8 +20,8 @@ import (
 
 func main() {
 	cfg := config.FromEnv()
-	if cfg.JWTSecret == "" {
-		log.Println("warning: JWT_SECRET is empty")
+	if len(strings.TrimSpace(cfg.JWTSecret)) < 16 {
+		log.Fatal("JWT_SECRET must contain at least 16 characters")
 	}
 
 	// If license env values are missing, recover persisted config from the DB.

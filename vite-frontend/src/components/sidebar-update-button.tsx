@@ -16,6 +16,7 @@ import {
   ModalHeader,
 } from "@/shadcn-bridge/heroui/modal";
 import { Spinner } from "@/shadcn-bridge/heroui/spinner";
+import { ReleaseNotes } from "@/components/release-notes";
 import {
   checkSystemUpgrade,
   runSystemUpgrade,
@@ -74,6 +75,16 @@ export function SidebarUpdateButton({
     !checking &&
     !upgrading;
   const updateButtonDisabled = !canUpgrade || !hasUpdate;
+  const latestRelease = useMemo(() => {
+    const releases = state.data?.releases || [];
+    const targetVersion = state.data?.latestVersion;
+
+    return (
+      releases.find((release) => release.version === targetVersion) ||
+      releases[0] ||
+      null
+    );
+  }, [state.data?.latestVersion, state.data?.releases]);
 
   const capabilityReasons = useMemo(() => {
     return state.data?.capability?.reasons?.filter(Boolean) || [];
@@ -349,6 +360,8 @@ export function SidebarUpdateButton({
                         </div>
                       )}
                     </div>
+
+                    <ReleaseNotes body={latestRelease?.body} />
 
                     <div className="grid grid-cols-1 gap-y-1.5 pl-4 text-xs text-danger-600/80 dark:text-danger-400/80">
                       <p className="list-item">

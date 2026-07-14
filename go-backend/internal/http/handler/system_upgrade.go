@@ -47,6 +47,7 @@ type systemUpgradeCapabilityData struct {
 type systemUpgradeReleaseData struct {
 	Version     string `json:"version"`
 	Name        string `json:"name"`
+	Body        string `json:"body"`
 	PublishedAt string `json:"publishedAt"`
 	Prerelease  bool   `json:"prerelease"`
 	Channel     string `json:"channel"`
@@ -396,6 +397,7 @@ func releasesForChannel(releases []githubRelease, channel string) []systemUpgrad
 		items = append(items, systemUpgradeReleaseData{
 			Version:     tag,
 			Name:        r.Name,
+			Body:        r.Body,
 			PublishedAt: r.PublishedAt,
 			Prerelease:  itemChannel == releaseChannelDev,
 			Channel:     itemChannel,

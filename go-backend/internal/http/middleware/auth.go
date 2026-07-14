@@ -104,6 +104,10 @@ func shouldSkip(path string) bool {
 		return true
 	case path == "/api/v1/user/register":
 		return true
+	case path == "/api/v1/payment/callback/yipay":
+		return true
+	case path == "/api/v1/payment/callback/usdt":
+		return true
 	case path == "/api/v1/node/info":
 		return true
 	case path == "/api/v1/federation/connect":
@@ -126,49 +130,83 @@ func shouldSkip(path string) bool {
 }
 
 func requiresAdmin(path string) bool {
-	if strings.HasPrefix(path, "/api/v1/monitor/permission/") {
-		return true
-	}
-
-	if strings.HasPrefix(path, "/api/v1/group/") {
-		return true
-	}
-
-	if strings.HasPrefix(path, "/api/v1/federation/share/") {
-		return true
-	}
-
-	if strings.HasPrefix(path, "/api/v1/node/") {
-		return true
-	}
-
-	if strings.HasPrefix(path, "/api/v1/speed-limit/") {
-		return true
-	}
-
-	if strings.HasPrefix(path, "/api/v1/backup/") {
-		return true
-	}
-
-	if strings.HasPrefix(path, "/api/v1/api/v1/backup/") {
-		return true
-	}
-
-	if strings.HasPrefix(path, "/api/v1/tunnel/") {
-		if strings.HasPrefix(path, "/api/v1/tunnel/user/tunnel") {
-			return false
-		}
-		return true
-	}
-
-	switch path {
-	case "/api/v1/user/create", "/api/v1/user/list", "/api/v1/user/update", "/api/v1/user/delete", "/api/v1/user/reset":
-		return true
-	case "/api/v1/config/update", "/api/v1/config/update-single":
-		return true
-	case "/api/v1/announcement/update":
-		return true
-	default:
+	if path == "/api/v1/tunnel/user/tunnel" {
 		return false
 	}
+
+	for _, prefix := range adminPathPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+
+	_, ok := adminPaths[path]
+	return ok
+}
+
+var adminPathPrefixes = []string{
+	"/api/v1/monitor/permission/",
+	"/api/v1/group/",
+	"/api/v1/federation/share/",
+	"/api/v1/federation/node/",
+	"/api/v1/node/",
+	"/api/v1/node-group/",
+	"/api/v1/node-tag/",
+	"/api/v1/tls-template/",
+	"/api/v1/path/",
+	"/api/v1/speed-limit/",
+	"/api/v1/policy/",
+	"/api/v1/backup/",
+	"/api/v1/api/v1/backup/",
+	"/api/v1/tunnel/",
+	"/api/v1/tunnel-group-new/",
+	"/api/v1/tunnel-group/",
+	"/api/v1/tunnel-list/",
+	"/api/v1/order/admin/",
+}
+
+var adminPaths = map[string]struct{}{
+	"/api/v1/user/create":                     {},
+	"/api/v1/user/list":                       {},
+	"/api/v1/user/update":                     {},
+	"/api/v1/user/delete":                     {},
+	"/api/v1/user/batch-delete":               {},
+	"/api/v1/user/reset":                      {},
+	"/api/v1/user/batch-reset":                {},
+	"/api/v1/user/quota/reset":                {},
+	"/api/v1/user/quota/history":              {},
+	"/api/v1/user/quota/history/delete":       {},
+	"/api/v1/user/renewal-logs":               {},
+	"/api/v1/user/renewal-log/delete":         {},
+	"/api/v1/user/update-order":               {},
+	"/api/v1/user/groups":                     {},
+	"/api/v1/config/update":                   {},
+	"/api/v1/config/update-single":            {},
+	"/api/v1/announcement/update":             {},
+	"/api/v1/system/upgrade":                  {},
+	"/api/v1/panel/upgrade/check":             {},
+	"/api/v1/panel/upgrade/releases":          {},
+	"/api/v1/panel/upgrade":                   {},
+	"/api/v1/license/config":                  {},
+	"/api/v1/license/transfer":                {},
+	"/api/v1/payment/stats":                   {},
+	"/api/v1/payment/config/save":             {},
+	"/api/v1/payment/config/admin/list":       {},
+	"/api/v1/payment/config/delete":           {},
+	"/api/v1/billing/redeem/create":           {},
+	"/api/v1/billing/redeem/list":             {},
+	"/api/v1/billing/redeem/delete":           {},
+	"/api/v1/billing/discount/create":         {},
+	"/api/v1/billing/discount/list":           {},
+	"/api/v1/billing/discount/delete":         {},
+	"/api/v1/billing/balance-log/list":        {},
+	"/api/v1/billing/balance-log/delete":      {},
+	"/api/v1/billing/balance-log/cleanup":     {},
+	"/api/v1/billing/feature-status/save":     {},
+	"/api/v1/package/create":                  {},
+	"/api/v1/package/update":                  {},
+	"/api/v1/package/delete":                  {},
+	"/api/v1/package/assign":                  {},
+	"/api/v1/package/store-status/save":       {},
+	"/api/v1/package/toggle-auto-buy-traffic": {},
 }

@@ -339,7 +339,7 @@ show_menu() {
 }
 
 generate_random() {
-  LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c16
+  LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c32
 }
 
 upsert_env_var() {
@@ -533,6 +533,7 @@ install_panel() {
 
   cat > .env <<EOF
 JWT_SECRET=$JWT_SECRET
+CORS_ALLOWED_ORIGINS=
 FRONTEND_PORT=$FRONTEND_PORT
 BACKEND_PORT=$BACKEND_PORT
 FLUX_VERSION=$CURRENT_VERSION
